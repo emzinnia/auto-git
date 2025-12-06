@@ -173,7 +173,7 @@ def ask_openai_for_commits(files, diff):
         [
           {{
             "type": "feat|fix|docs|style|refactor|perf|test|chore|build|ci",
-            "title": "Short descriptive title, no type prefix",
+            "title": "Short descriptive title, no type prefix, use lowercase",
             "body": "Longer description of the change.",
             "files": ["file1.js", "file2.ts"]
           }}
