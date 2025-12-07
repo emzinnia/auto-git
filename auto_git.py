@@ -17,6 +17,8 @@ from watchdog.events import FileSystemEventHandler
 import warnings, urllib3
 warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
 
+__version__ = "0.1.0"
+
 COMMIT_TYPES = {
     "feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"
 }
