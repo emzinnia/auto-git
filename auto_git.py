@@ -50,6 +50,25 @@ def get_commits_since_push(fallback_count=10):
     lines = [l for l in log_output.splitlines() if l.strip()]
     return source_desc, lines
 
+def get_unpushed_commits(max_count=20):
+    upstream = get_upstream_ref()
+    if upstream:
+        rev_range = f"{upstream}..HEAD"
+        source_desc = f"unpushed commits ({rev_range})"
+    else:
+        rev_range = f"HEAD~{max_count}..HEAD"
+        source_desc = f"last {max_count} commits (no upstream found)"
+
+    log_format = "%H%x1f%s%x1f%b%x1e"
+    raw = run(f'git log --reverse --first-parent --format="{log_format}" {rev_range}')
+    commits = []
+    for record in raw.split("\x1e"):
+        if not record.strip():
+            continue
+        sha, subj, body = record.split("\x1f", 2)
+        commits.append({"sha": sha, "subject": subj.strip(), "body": body.strip()})
+    return source_desc, commits
+
 def is_tracked(path):
     result = subprocess.run(
         ["git", "ls-files", "--error-unmatch", path],
@@ -511,8 +530,9 @@ def watch(interval):
             signal.signal(sig, _handle_signal)
 
     try:
+        # Use stop_event.wait so Ctrl+C/signal stops promptly without waiting full interval
         while not stop_event.is_set():
-            time.sleep(interval)
+            stop_event.wait(interval)
     except KeyboardInterrupt:
         _handle_signal(signal.SIGINT, None)
     finally:
