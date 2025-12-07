@@ -232,9 +232,16 @@ def apply_commits(commit_list):
         if safe_body.strip():
             cmd += f' -m "{safe_body}"'
 
-        run(cmd)
-        click.secho(f"Committed", fg="green")
-        click.secho(f"{subject}")
+        try:
+            run(cmd)
+            click.secho("Committed", fg="green")
+            click.secho(f"{subject}")
+        except subprocess.CalledProcessError as exc:
+            err_out = exc.output
+            decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
+            click.secho("Commit failed; skipping remaining steps for this commit.", fg="red")
+            if decoded:
+                click.echo(decoded)
 
 
 class ChangeHandler(FileSystemEventHandler):
