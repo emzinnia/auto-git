@@ -4,6 +4,8 @@ import json
 import time
 import subprocess
 import sys
+import signal
+import threading
 from textwrap import dedent
 
 import click
@@ -168,6 +170,20 @@ def get_openai_client():
 
     return openai.OpenAI(api_key=api_key)
 
+def format_commit_preview(commits):
+    lines = []
+    for idx, c in enumerate(commits, start=1):
+        ctype = c.get("type", "?")
+        title = c.get("title", "").strip()
+        body = (c.get("body") or "").strip()
+        files = c.get("files") or []
+        lines.append(f"{idx}. {ctype}: {title}")
+        if body:
+            lines.append(f"   body: {body}")
+        if files:
+            lines.append(f"   files: {', '.join(files)}")
+    return "\n".join(lines)
+
 def parse_json_from_openai_response(text):
     stripped = text.strip()
 
@@ -187,7 +203,7 @@ def parse_json_from_openai_response(text):
 
 def ask_openai_for_commits(files, diff):
     client = get_openai_client()
-    click.echo(f"Asking OpenAI for commits for files: {files}")
+    display_spinning_animation("Consulting our AI overlords...")
 
     prompt = dedent(f"""
         You are an AI that analyzes Git diffs and produces commit messages.
@@ -245,7 +261,19 @@ def apply_commits(commit_list):
         subject = lint_commit_dict(commit)
         body = commit.get("body") or ""
 
-        run("git add " + " ".join(files))
+        try:
+            # Use -A to ensure deletions are staged too; plain git add errors on removed paths
+            run("git add -A -- " + " ".join(files))
+        except subprocess.CalledProcessError as exc:
+            err_out = exc.output
+            decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
+            click.secho(
+                f"Staging failed for files: {', '.join(files)}; skipping this commit.",
+                fg="red",
+            )
+            if decoded:
+                click.echo(decoded)
+            continue
 
         # Escape double-quotes in body to avoid shell issues
         safe_body = body.replace('"', '\\"')
@@ -290,11 +318,6 @@ class ChangeHandler(FileSystemEventHandler):
         commits = ask_openai_for_commits(files, diff)
         apply_commits(commits)
 
-# files = get_changed_files(staged=True, unstaged=True)
-# print(files)
-# print(get_current_branch())
-# print(get_origin_repo_slug())
-
 @click.group()
 def cli():
     pass
@@ -332,7 +355,8 @@ def generate(staged, unstaged, untracked):
 @click.option("--unstaged", is_flag=True, help="Include unstaged changes")
 @click.option("--staged", is_flag=True, help="Include staged changes")
 @click.option("--untracked", is_flag=True, help="Include untracked files")
-def commit(staged, unstaged, untracked):
+@click.option("--dry-run", is_flag=True, help="Preview commits and diff without committing")
+def commit(staged, unstaged, untracked, dry_run):
     if not (staged or unstaged):
         staged = unstaged = True
 
@@ -356,6 +380,16 @@ def commit(staged, unstaged, untracked):
     commits = ask_openai_for_commits(files, diff)
 
     click.echo(json.dumps(commits, indent=2))
+    if dry_run:
+        click.secho("Dry run: planned commits", fg="yellow")
+        preview = format_commit_preview(commits)
+        if preview:
+            click.echo(preview)
+        if diff:
+            click.secho("\nDiff used for planning:", fg="yellow")
+            click.echo(diff)
+        return
+
     apply_commits(commits)
 
 @cli.command()
@@ -394,11 +428,24 @@ def watch(interval):
     observer.schedule(event_handler, path=".", recursive=True)
     observer.start()
 
+    stop_event = threading.Event()
+
+    def _handle_signal(signum, frame):
+        if not stop_event.is_set():
+            click.echo("\nStopping watch...")
+            stop_event.set()
+
+    signal.signal(signal.SIGINT, _handle_signal)
+    for sig_name in ("SIGTERM", "SIGQUIT"):
+        sig = getattr(signal, sig_name, None)
+        if sig is not None:
+            signal.signal(sig, _handle_signal)
+
     try:
-        while True:
+        while not stop_event.is_set():
             time.sleep(interval)
     except KeyboardInterrupt:
-        click.echo("\nStopping watch...")
+        _handle_signal(signal.SIGINT, None)
     finally:
         observer.stop()
         observer.join(timeout=5)

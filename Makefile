@@ -27,3 +27,11 @@ lint:
 watch:
 \tpython3 auto_git.py watch $(ARGS)
 
+install:
+	ln -sf $(abspath auto_git.py) /usr/local/bin/auto-git
+	chmod +x $(abspath auto_git.py)
+	@echo "auto-git is now available globally as 'auto-git'"
+
+uninstall:
+	rm -f /usr/local/bin/auto-git
+	@echo "'auto-git' has been removed from /usr/local/bin"
