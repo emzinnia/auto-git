@@ -29,6 +29,18 @@ OPENAI_MODEL_PR = "gpt-4.1-mini"
 def run(cmd):
     return subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
 
+def is_git_ignored(path):
+    rel_path = os.path.relpath(path, ".")
+    if rel_path.startswith(".git"):
+        return True
+    result = subprocess.run(
+        ["git", "check-ignore", "-q", rel_path],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0
+
+
 def get_untracked_files():
     out = run("git ls-files --others --exclude-standard")
     if not out:
@@ -250,9 +262,12 @@ class ChangeHandler(FileSystemEventHandler):
         self.ignore_dirs = ignore_dirs or []
 
     def on_any_event(self, event):
+        rel_path = os.path.relpath(event.src_path, ".")
         for d in self.ignore_dirs:
-            if event.src_path.startswith(d):
+            if rel_path.startswith(d):
                 return
+        if is_git_ignored(event.src_path):
+            return
 
         click.echo("\nChange detected! Auto-generating commits...")
         # Stage everything (we then split by AI into multiple commits)
