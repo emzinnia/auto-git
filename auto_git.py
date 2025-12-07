@@ -298,6 +298,38 @@ def ask_openai_for_commits(files, diff):
 
     return commits
 
+def ask_openai_for_amendments(commits):
+    client = get_openai_client()
+    prompt = dedent(f"""
+        You are helping rewrite commit messages for a linear Git history.
+        For each commit, propose a new Conventional Commit subject and optional body.
+        Keep the same commit order; do not merge or split commits.
+
+        Return JSON array like:
+        [
+          {{
+            "sha": "<orig sha>",
+            "subject": "feat: better subject",
+            "body": "optional body"
+          }}
+        ]
+
+        Commits (oldest first):
+        {json.dumps(commits, indent=2)}
+    """)
+
+    response = client.responses.create(model=OPENAI_MODEL_COMMITS, input=prompt)
+    raw_text = response.output_text
+    amendments = parse_json_from_openai_response(raw_text)
+
+    sha_set = {c["sha"] for c in commits}
+    for a in amendments:
+        sha = a.get("sha")
+        if sha not in sha_set:
+            raise ValueError(f"Amendment references unknown sha: {sha}")
+        _ = lint_git_commit_subject(a.get("subject", ""))
+    return amendments
+
 def apply_commits(commit_list):
     for commit in commit_list:
         files = commit.get("files", [])
