@@ -106,17 +106,14 @@ def get_origin_repo_slug():
 
     return path
 
-def display_spinning_animation():
-    message = "Watching for changes... (Ctrl+C to stop)"
+def display_spinning_animation(message="Watching for changes... (Ctrl+C to stop)"):
     animation = "|/-\\"
     spin_cycles = 24
     for i in range(spin_cycles):
         frame = animation[i % len(animation)]
-        sys.stdout.write(f"\r{message} {frame}")
-        sys.stdout.flush()
+        click.echo(f"\r{message} {frame}", nl=False)
         time.sleep(0.05)
-    sys.stdout.write(f"\r{message}    \n")
-    sys.stdout.flush()
+    click.echo(f"\r{message}    \n")
 
 def lint_commit_dict(commit):
     ctype = commit.get("type")
