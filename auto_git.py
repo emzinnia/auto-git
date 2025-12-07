@@ -399,10 +399,13 @@ def watch(interval):
             time.sleep(interval)
     except KeyboardInterrupt:
         click.echo("\nStopping watch...")
+    finally:
         observer.stop()
-        click.echo("Watch stopped")
-    
-    observer.join()
+        observer.join(timeout=5)
+        if observer.is_alive():
+            click.echo("Watcher thread did not exit cleanly; forcing shutdown.", err=True)
+        else:
+            click.echo("Watch stopped")
 
 if __name__ == "__main__":
     cli()
