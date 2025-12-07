@@ -37,6 +37,19 @@ def get_upstream_ref():
     except subprocess.CalledProcessError:
         return None
 
+def get_commits_since_push(fallback_count=10):
+    upstream = get_upstream_ref()
+    if upstream:
+        log_cmd = f"git log {upstream}..HEAD --pretty=format:%s"
+        source_desc = f"commits since last push ({upstream}..HEAD)"
+    else:
+        log_cmd = f"git log -{fallback_count} --pretty=format:%s"
+        source_desc = f"last {fallback_count} commits (no upstream found)"
+
+    log_output = run(log_cmd)
+    lines = [l for l in log_output.splitlines() if l.strip()]
+    return source_desc, lines
+
 def is_tracked(path):
     result = subprocess.run(
         ["git", "ls-files", "--error-unmatch", path],
@@ -323,6 +336,14 @@ def apply_commits(commit_list):
         try:
             run(cmd)
             click.secho(f"✔ Committed: {subject}", fg="green", bold=True)
+            # Show newest-first commits since last push so the just-added commit is on top
+            source_desc, commits = get_commits_since_push()
+            click.echo(f"Commits inspected: {source_desc}")
+            if commits:
+                for csubj in commits:
+                    click.echo(f"  - {csubj}")
+            else:
+                click.echo("  (none)")
         except subprocess.CalledProcessError as exc:
             err_out = exc.output
             decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
@@ -438,12 +459,9 @@ def status():
     click.echo(run("git diff --name-only") or "(none)")
 
 @cli.command()
-def lint():
-    log_cmd = "git log --pretty=format:%s"
-    source_desc = "all commits in history (HEAD)"
-
-    log_output = run(log_cmd)
-    lines = [l for l in log_output.splitlines() if l.strip()]
+@click.argument("count", required=False, default=10)
+def lint(count):
+    source_desc, lines = get_commits_since_push(fallback_count=count)
 
     click.echo(f"Commits inspected: {source_desc}")
     if lines:
