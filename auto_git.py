@@ -377,9 +377,7 @@ def lint(count):
     else:
         click.echo(f"Last {len(lines)} commits pass lint")
 
-@cli.command()
-@click.option("--interval", default=60, help="Polling interval in seconds")
-def watch(interval):
+def display_spinning_animation():
     message = "Watching for changes... (Ctrl+C to stop)"
     animation = "|/-\\"
     spin_cycles = 24
@@ -391,6 +389,9 @@ def watch(interval):
     sys.stdout.write(f"\r{message}    \n")
     sys.stdout.flush()
 
+@cli.command()
+@click.option("--interval", default=60, help="Polling interval in seconds")
+def watch(interval):
     event_handler = ChangeHandler(ignore_dirs=[".git"])
     observer = Observer()
     observer.schedule(event_handler, path=".", recursive=True)
