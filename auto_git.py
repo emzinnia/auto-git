@@ -187,7 +187,7 @@ def parse_json_from_openai_response(text):
 
 def ask_openai_for_commits(files, diff):
     client = get_openai_client()
-    print(f"Asking OpenAI for commits for files: {files}")
+    click.echo(f"Asking OpenAI for commits for files: {files}")
 
     prompt = dedent(f"""
         You are an AI that analyzes Git diffs and produces commit messages.
