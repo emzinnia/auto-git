@@ -256,8 +256,7 @@ def apply_commits(commit_list):
 
         try:
             run(cmd)
-            click.secho("Committed", fg="green")
-            click.secho(f"{subject}")
+            click.secho(f"✔ Committed: {subject}", fg="green", bold=True)
         except subprocess.CalledProcessError as exc:
             err_out = exc.output
             decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
