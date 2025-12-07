@@ -438,15 +438,9 @@ def status():
     click.echo(run("git diff --name-only") or "(none)")
 
 @cli.command()
-@click.argument("count", required=False, default=10)
-def lint(count):
-    upstream = get_upstream_ref()
-    if upstream:
-        log_cmd = f"git log {upstream}..HEAD --pretty=format:%s"
-        source_desc = f"commits since last push ({upstream}..HEAD)"
-    else:
-        log_cmd = f"git log -{count} --pretty=format:%s"
-        source_desc = f"last {count} commits (no upstream found)"
+def lint():
+    log_cmd = "git log --pretty=format:%s"
+    source_desc = "all commits in history (HEAD)"
 
     log_output = run(log_cmd)
     lines = [l for l in log_output.splitlines() if l.strip()]
