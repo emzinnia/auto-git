@@ -270,7 +270,17 @@ def ask_openai_for_commits(files, diff):
            - Provide a short title (<75 chars), without the type prefix.
            - Provide a longer body description (can be multi-line, markdown ok).
            - List which files belong to that commit.
-        3. Output ONLY valid JSON in this structure:
+        3. Properly determine the type of commit based on the changes.
+            - feat: new feature or improvement
+            - fix: bug fix
+            - docs: documentation
+            - style: code style
+            - refactor: code refactor
+            - perf: performance improvement
+            - test: test improvement
+            - chore: chore
+            - build: build improvement
+        4. Output ONLY valid JSON in this structure:
 
         [
           {{
