@@ -31,6 +31,12 @@ OPENAI_MODEL_PR = "gpt-4.1-mini"
 def run(cmd):
     return subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
 
+def get_upstream_ref():
+    try:
+        return run("git rev-parse --abbrev-ref --symbolic-full-name @{u}")
+    except subprocess.CalledProcessError:
+        return None
+
 def is_tracked(path):
     result = subprocess.run(
         ["git", "ls-files", "--error-unmatch", path],
@@ -434,8 +440,24 @@ def status():
 @cli.command()
 @click.argument("count", required=False, default=10)
 def lint(count):
-    log_output = run(f"git log -{count} --pretty=format:%s")
+    upstream = get_upstream_ref()
+    if upstream:
+        log_cmd = f"git log {upstream}..HEAD --pretty=format:%s"
+        source_desc = f"commits since last push ({upstream}..HEAD)"
+    else:
+        log_cmd = f"git log -{count} --pretty=format:%s"
+        source_desc = f"last {count} commits (no upstream found)"
+
+    log_output = run(log_cmd)
     lines = [l for l in log_output.splitlines() if l.strip()]
+
+    click.echo(f"Commits inspected: {source_desc}")
+    if lines:
+        for subj in lines:
+            click.echo(f"  - {subj}")
+    else:
+        click.echo("  (none)")
+        return
 
     errors = []
     for subj in lines:
