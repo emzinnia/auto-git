@@ -491,6 +491,7 @@ class ChangeHandler(FileSystemEventHandler):
         apply_commits(commits)
 
 @click.group()
+@click.version_option(version=__version__)
 def cli():
     pass
 
