@@ -269,14 +269,38 @@ def apply_commits(commit_list):
         subject = lint_commit_dict(commit)
         body = commit.get("body") or ""
 
+        stage_targets = []
+        skipped_missing = []
+        for f in files:
+            if os.path.exists(f):
+                stage_targets.append(f)
+            elif is_tracked(f):
+                # Track deletion
+                stage_targets.append(f)
+            else:
+                skipped_missing.append(f)
+
+        if skipped_missing:
+            click.secho(
+                f"Skipping untracked missing files: {', '.join(skipped_missing)}",
+                fg="yellow",
+            )
+
+        if not stage_targets:
+            click.secho(
+                f"No valid files to stage for commit '{subject}'; skipping.",
+                fg="yellow",
+            )
+            continue
+
         try:
             # Use -A to ensure deletions are staged too; plain git add errors on removed paths
-            run("git add -A -- " + " ".join(files))
+            run("git add -A -- " + " ".join(stage_targets))
         except subprocess.CalledProcessError as exc:
             err_out = exc.output
             decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
             click.secho(
-                f"Staging failed for files: {', '.join(files)}; skipping this commit.",
+                f"Staging failed for files: {', '.join(stage_targets)}; skipping this commit.",
                 fg="red",
             )
             if decoded:
