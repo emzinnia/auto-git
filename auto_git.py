@@ -331,6 +331,7 @@ def ask_openai_for_amendments(commits):
     return amendments
 
 def apply_commits(commit_list):
+    committed_subjects = []
     for commit in commit_list:
         files = commit.get("files", [])
         if not files:
@@ -386,21 +387,24 @@ def apply_commits(commit_list):
 
         try:
             run(cmd)
-            click.secho(f"✔ Committed: {subject}", fg="green", bold=True)
-            # Show newest-first commits since last push so the just-added commit is on top
-            source_desc, commits = get_commits_since_push()
-            click.echo(f"Commits inspected: {source_desc}")
-            if commits:
-                for csubj in commits:
-                    click.echo(f"  - {csubj}")
-            else:
-                click.echo("  (none)")
+            committed_subjects.append(subject)
         except subprocess.CalledProcessError as exc:
             err_out = exc.output
             decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
             click.secho("Commit failed; skipping remaining steps for this commit.", fg="red")
             if decoded:
                 click.echo(decoded)
+
+    if committed_subjects:
+        click.secho(f"✔ Committed: {', '.join(committed_subjects)}", fg="green", bold=True)
+        # Show newest-first commits since last push so the just-added commit is on top
+        source_desc, commits = get_commits_since_push()
+        click.echo(f"Commits inspected: {source_desc}")
+        if commits:
+            for csubj in commits:
+                click.echo(f"  - {csubj}")
+        else:
+            click.echo("  (none)")
 
 
 def rewrite_commits(amendments, allow_dirty=False):
@@ -547,10 +551,6 @@ def commit(staged, unstaged, untracked, dry_run):
 @click.option("--dry-run", is_flag=True, help="Preview amendments without rewriting")
 @click.option("--allow-dirty", is_flag=True, help="Allow running with a dirty working tree")
 def amend_unpushed(max_count, dry_run, allow_dirty):
-    """
-    Ask AI to suggest new messages for unpushed commits and rewrite them linearly.
-    Only supports linear history (first-parent); merges are skipped.
-    """
     source_desc, commits = get_unpushed_commits(max_count=max_count)
     if not commits:
         click.echo("No commits to amend.")
