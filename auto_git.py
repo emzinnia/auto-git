@@ -28,7 +28,14 @@ OPENAI_MODEL_PR = "gpt-4.1-mini"
 def run(cmd):
     return subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
 
-def get_changed_files(staged=False, unstaged=False):
+def get_untracked_files():
+    out = run("git ls-files --others --exclude-standard")
+    if not out:
+        return []
+    return [f for f in out.splitlines() if f.strip()]
+
+
+def get_changed_files(staged=False, unstaged=False, untracked=False, untracked_files=None):
     files = []
 
     if staged:
@@ -42,16 +49,26 @@ def get_changed_files(staged=False, unstaged=False):
             for f in out.splitlines():
                 if f and f not in files:
                     files.append(f)
+
+    if untracked:
+        if untracked_files is None:
+            untracked_files = get_untracked_files()
+        for f in untracked_files:
+            if f and f not in files:
+                files.append(f)
     
     return files
 
-def get_diff(files, staged=False, unstaged=False):
+def get_diff(files, staged=False, unstaged=False, untracked_files=None):
     diff_parts = []
 
     if staged and files:
         diff_parts.append(f"git diff --cached -- " + " ".join(files))
     if unstaged and files:
         diff_parts.append(f"git diff -- " + " ".join(files))
+    if untracked_files:
+        for f in untracked_files:
+            diff_parts.append(f"git diff --no-index -- /dev/null {f}")
 
     return "\n".join(part for part in diff_parts if part)
 
@@ -216,13 +233,13 @@ def apply_commits(commit_list):
             cmd += f' -m "{safe_body}"'
 
         run(cmd)
-        click.echo(f"Committed: {subject}")
+        click.secho(f"Committed", fg="green")
+        click.secho(f"{subject}")
 
 
 class ChangeHandler(FileSystemEventHandler):
-    def __init__(self, ignore_dirs=None, auto_push=False):
+    def __init__(self, ignore_dirs=None):
         self.ignore_dirs = ignore_dirs or []
-        self.auto_push = auto_push
 
     def on_any_event(self, event):
         for d in self.ignore_dirs:
@@ -242,11 +259,6 @@ class ChangeHandler(FileSystemEventHandler):
         commits = ask_openai_for_commits(files, diff)
         apply_commits(commits)
 
-        if self.auto_push:
-            branch = get_current_branch()
-            click.echo(f"Auto-pushing branch {branch}...")
-            run(f"git push origin {branch}")
-
 # files = get_changed_files(staged=True, unstaged=True)
 # print(files)
 # print(get_current_branch())
@@ -259,16 +271,28 @@ def cli():
 @cli.command()
 @click.option("--unstaged", is_flag=True, help="Include unstaged changes")
 @click.option("--staged", is_flag=True, help="Include staged changes")
-def generate(staged, unstaged):
+@click.option("--untracked", is_flag=True, help="Include untracked files")
+def generate(staged, unstaged, untracked):
     if not (staged or unstaged):
         staged = unstaged = True
 
-    files = get_changed_files(staged=staged, unstaged=unstaged)
+    untracked_files = get_untracked_files() if untracked else []
+    files = get_changed_files(
+        staged=staged,
+        unstaged=unstaged,
+        untracked=untracked,
+        untracked_files=untracked_files,
+    )
     if not files:
         click.echo("No changed files found")
         return
     
-    diff = get_diff(files, staged=staged, unstaged=unstaged)
+    diff = get_diff(
+        files,
+        staged=staged,
+        unstaged=unstaged,
+        untracked_files=untracked_files,
+    )
     commits = ask_openai_for_commits(files, diff)
     
     click.echo(json.dumps(commits, indent=2))
@@ -276,17 +300,28 @@ def generate(staged, unstaged):
 @cli.command()
 @click.option("--unstaged", is_flag=True, help="Include unstaged changes")
 @click.option("--staged", is_flag=True, help="Include staged changes")
-@click.option("--push", "auto_push", is_flag=True, help="Push to origin after committing")
-def commit(staged, unstaged, auto_push):
+@click.option("--untracked", is_flag=True, help="Include untracked files")
+def commit(staged, unstaged, untracked):
     if not (staged or unstaged):
         staged = unstaged = True
 
-    files = get_changed_files(staged=staged, unstaged=unstaged)
+    untracked_files = get_untracked_files() if untracked else []
+    files = get_changed_files(
+        staged=staged,
+        unstaged=unstaged,
+        untracked=untracked,
+        untracked_files=untracked_files,
+    )
     if not files:
         click.echo("No changed files found")
         return
     
-    diff = get_diff(files, staged=staged, unstaged=unstaged)
+    diff = get_diff(
+        files,
+        staged=staged,
+        unstaged=unstaged,
+        untracked_files=untracked_files,
+    )
     commits = ask_openai_for_commits(files, diff)
 
     click.echo(json.dumps(commits, indent=2))
@@ -321,11 +356,10 @@ def lint(count):
 
 @cli.command()
 @click.option("--interval", default=2, help="Polling interval in seconds")
-@click.option("--push", "auto_push", is_flag=True, help="Push to origin after committing")
-def watch(interval, auto_push):
+def watch(interval):
     click.echo("Watching for changes... (Ctrl+C to stop)")
 
-    event_handler = ChangeHandler(ignore_dirs=[".git"], auto_push=auto_push)
+    event_handler = ChangeHandler(ignore_dirs=[".git"])
     observer = Observer()
     observer.schedule(event_handler, path=".", recursive=True)
     observer.start()
