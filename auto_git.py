@@ -278,7 +278,7 @@ class ChangeHandler(FileSystemEventHandler):
         if is_git_ignored(event.src_path):
             return
 
-        click.echo("\nChange detected! Auto-generating commits...")
+        display_spinning_animation("Checking for changes...")
         # Stage everything (we then split by AI into multiple commits)
         run("git add -A")
 
