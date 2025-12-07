@@ -31,6 +31,14 @@ OPENAI_MODEL_PR = "gpt-4.1-mini"
 def run(cmd):
     return subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
 
+def is_tracked(path):
+    result = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", path],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return result.returncode == 0
+
 def is_git_ignored(path):
     rel_path = os.path.relpath(path, ".")
     if rel_path.startswith(".git"):
