@@ -1,37 +1,55 @@
-.PHONY: help install generate commit status lint watch
+.PHONY: help venv deps dev clean install uninstall
+
+PYTHON := python3.11
+VENV := venv
+BIN := $(VENV)/bin
+INSTALL_PATH := /usr/local/bin/auto-git
 
 help:
-\t@echo "Common commands:"
-\t@echo "  make install     Install dependencies"
-\t@echo "  make generate    Generate commit suggestions (uses staged+unstaged)"
-\t@echo "  make commit      Generate and apply commits (uses staged+unstaged)"
-\t@echo "  make status      Show staged/unstaged files"
-\t@echo "  make lint        Lint recent commit messages"
-\t@echo "  make watch       Watch for changes and auto-commit"
+	@echo "auto-git - AI-powered Git commit message generator"
+	@echo ""
+	@echo "Development:"
+	@echo "  make venv     - Create virtual environment"
+	@echo "  make deps     - Install dependencies"
+	@echo "  make dev      - Setup development environment (venv + deps)"
+	@echo "  make clean    - Remove venv and build artifacts"
+	@echo ""
+	@echo "Installation:"
+	@echo "  make install   - Install auto-git command to $(INSTALL_PATH)"
+	@echo "  make uninstall - Remove auto-git from $(INSTALL_PATH)"
 
-install:
-\tpython3 -m pip install -r requirements.txt
+venv:
+	$(PYTHON) -m venv $(VENV)
+	@echo "Virtual environment created at $(VENV)/"
 
-generate:
-\tpython3 auto_git.py generate $(ARGS)
+deps: $(BIN)/activate
+	$(BIN)/pip install --upgrade pip
+	$(BIN)/pip install -r requirements.txt
+	@echo "Dependencies installed"
 
-commit:
-\tpython3 auto_git.py commit $(ARGS)
+dev: venv deps
+	@echo "Development environment ready"
+	@echo "Activate with: source $(VENV)/bin/activate"
 
-status:
-\tpython3 auto_git.py status
+clean:
+	rm -rf $(VENV)
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@echo "Cleaned up"
 
-lint:
-\tpython3 auto_git.py lint $(ARGS)
-
-watch:
-\tpython3 auto_git.py watch $(ARGS)
-
-install:
-	ln -sf $(abspath auto_git.py) /usr/local/bin/auto-git
-	chmod +x $(abspath auto_git.py)
-	@echo "auto-git is now available globally as 'auto-git'"
+install: deps
+	@echo "Installing auto-git to $(INSTALL_PATH)..."
+	@echo '#!/bin/bash' | sudo tee $(INSTALL_PATH) > /dev/null
+	@echo 'source "$(CURDIR)/$(BIN)/activate"' | sudo tee -a $(INSTALL_PATH) > /dev/null
+	@echo 'python "$(CURDIR)/auto_git.py" "$$@"' | sudo tee -a $(INSTALL_PATH) > /dev/null
+	sudo chmod +x $(INSTALL_PATH)
+	@echo "Installed! Run 'auto-git --help' to get started"
 
 uninstall:
-	rm -f /usr/local/bin/auto-git
-	@echo "'auto-git' has been removed from /usr/local/bin"
+	@if [ -f $(INSTALL_PATH) ]; then \
+		sudo rm $(INSTALL_PATH); \
+		echo "Uninstalled auto-git from $(INSTALL_PATH)"; \
+	else \
+		echo "auto-git is not installed at $(INSTALL_PATH)"; \
+	fi
+
