@@ -403,6 +403,43 @@ def apply_commits(commit_list):
                 click.echo(decoded)
 
 
+def rewrite_commits(amendments, allow_dirty=False):
+    status = run("git status --porcelain")
+    if status.strip() and not allow_dirty:
+        raise RuntimeError("Working tree not clean; commit or stash before rewriting, or pass allow_dirty=True")
+
+    if not amendments:
+        return None
+
+    first_sha = amendments[0]["sha"]
+    parents_raw = run(f"git show -s --format=%P {first_sha}")
+    parents = parents_raw.split()
+    base_parent = parents[0] if parents else None
+
+    last_new = base_parent
+    for entry in amendments:
+        sha = entry["sha"]
+        subject = entry.get("subject", "").strip()
+        body = (entry.get("body") or "").strip()
+
+        tree = run(f"git show -s --format=%T {sha}")
+        cmd_parts = ["git", "commit-tree", tree]
+        if last_new:
+            cmd_parts.extend(["-p", last_new])
+        cmd_parts.extend(["-m", subject])
+        if body:
+            cmd_parts.extend(["-m", body])
+
+        new_sha = run(" ".join(cmd_parts))
+        last_new = new_sha
+
+    if not last_new:
+        raise RuntimeError("Failed to compute new commit chain.")
+
+    run(f"git reset --hard {last_new}")
+    return last_new
+
+
 class ChangeHandler(FileSystemEventHandler):
     def __init__(self, ignore_dirs=None, stop_event=None):
         self.ignore_dirs = ignore_dirs or []
