@@ -543,6 +543,67 @@ def commit(staged, unstaged, untracked, dry_run):
     apply_commits(commits)
 
 @cli.command()
+@click.option("--max-count", default=20, help="If no upstream, how many last commits to consider")
+@click.option("--dry-run", is_flag=True, help="Preview amendments without rewriting")
+@click.option("--allow-dirty", is_flag=True, help="Allow running with a dirty working tree")
+def amend_unpushed(max_count, dry_run, allow_dirty):
+    """
+    Ask AI to suggest new messages for unpushed commits and rewrite them linearly.
+    Only supports linear history (first-parent); merges are skipped.
+    """
+    source_desc, commits = get_unpushed_commits(max_count=max_count)
+    if not commits:
+        click.echo("No commits to amend.")
+        return
+
+    click.echo(f"Commits to consider ({source_desc}):")
+    for c in commits:
+        click.echo(f"  - {c['sha'][:7]} {c['subject']}")
+
+    amendments = ask_openai_for_amendments(commits)
+
+    amend_map = {a["sha"]: a for a in amendments}
+    amendments_sorted = []
+    for c in commits:
+        if c["sha"] in amend_map:
+            amendments_sorted.append(amend_map[c["sha"]])
+        else:
+            click.secho(f"No amendment returned for {c['sha']}; aborting.", fg="red")
+            return
+
+    click.secho("\nProposed amendments:", fg="yellow")
+    for a in amendments_sorted:
+        body = (a.get("body") or "").strip()
+        click.echo(f"- {a['sha'][:7]} -> {a['subject']}")
+        if body:
+            click.echo(f"  body: {body}")
+
+    if dry_run:
+        click.secho("\nDry run only; no changes applied.", fg="yellow")
+        return
+
+    # Refuse to rewrite merge history
+    upstream = get_upstream_ref()
+    if upstream:
+        rev_range = f"{upstream}..HEAD"
+    else:
+        first_parent = run(f"git show -s --format=%P {commits[0]['sha']}").split()
+        base = first_parent[0] if first_parent else ""
+        rev_range = f"{base}..{commits[-1]['sha']}"
+
+    merges = run(f"git rev-list --merges --first-parent {rev_range}")
+    if merges.strip():
+        click.secho("History contains merges; linear rewrite only. Aborting.", fg="red")
+        return
+
+    try:
+        rewrite_commits(amendments_sorted, allow_dirty=allow_dirty)
+        click.secho("Amendments applied. History rewritten.", fg="green", bold=True)
+        click.echo("Remember to push with --force-with-lease to update remote history.")
+    except Exception as exc:  # noqa: BLE001
+        click.secho(f"Amend failed: {exc}", fg="red")
+
+@cli.command()
 def status():
     click.echo("Staged:")
     click.echo(run("git diff --cached --name-only") or "(none)")
