@@ -399,12 +399,18 @@ def apply_commits(commit_list):
         click.secho(f"✔ Committed: {', '.join(committed_subjects)}", fg="green", bold=True)
         # Show newest-first commits since last push so the just-added commit is on top
         source_desc, commits = get_commits_since_push()
-        click.echo(f"Commits inspected: {source_desc}")
+        divider = click.style("─" * 48, fg="blue")
+        click.echo(divider)
+        click.secho(" Commit log (newest first) ", fg="cyan", bold=True, nl=False)
+        click.echo()
+        click.echo(f"Source: {source_desc}")
         if commits:
-            for csubj in commits:
-                click.echo(f"  - {csubj}")
+            pad = len(str(len(commits)))
+            for idx, csubj in enumerate(commits, 1):
+                click.echo(f"  {idx:>{pad}}. {csubj}")
         else:
             click.echo("  (none)")
+        click.echo(divider)
 
 
 def rewrite_commits(amendments, allow_dirty=False):
