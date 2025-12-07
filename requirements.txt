@@ -1,0 +1,6 @@
+click
+openai
+requests
+watchdog
+urllib3
+
