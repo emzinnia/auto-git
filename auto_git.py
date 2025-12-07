@@ -389,6 +389,7 @@ def lint(count):
 @cli.command()
 @click.option("--interval", default=60, help="Polling interval in seconds")
 def watch(interval):
+    display_spinning_animation()
     event_handler = ChangeHandler(ignore_dirs=[".git"])
     observer = Observer()
     observer.schedule(event_handler, path=".", recursive=True)
