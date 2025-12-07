@@ -3,6 +3,7 @@ import re
 import json
 import time
 import subprocess
+import sys
 from textwrap import dedent
 
 import click
@@ -362,9 +363,18 @@ def lint(count):
         click.echo(f"Last {len(lines)} commits pass lint")
 
 @cli.command()
-@click.option("--interval", default=2, help="Polling interval in seconds")
+@click.option("--interval", default=60, help="Polling interval in seconds")
 def watch(interval):
-    click.echo("Watching for changes... (Ctrl+C to stop)")
+    message = "Watching for changes... (Ctrl+C to stop)"
+    animation = "|/-\\"
+    spin_cycles = 24
+    for i in range(spin_cycles):
+        frame = animation[i % len(animation)]
+        sys.stdout.write(f"\r{message} {frame}")
+        sys.stdout.flush()
+        time.sleep(0.05)
+    sys.stdout.write(f"\r{message}    \n")
+    sys.stdout.flush()
 
     event_handler = ChangeHandler(ignore_dirs=[".git"])
     observer = Observer()
