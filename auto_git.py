@@ -353,10 +353,13 @@ def apply_commits(commit_list):
 
 
 class ChangeHandler(FileSystemEventHandler):
-    def __init__(self, ignore_dirs=None):
+    def __init__(self, ignore_dirs=None, stop_event=None):
         self.ignore_dirs = ignore_dirs or []
+        self.stop_event = stop_event
 
     def on_any_event(self, event):
+        if self.stop_event and self.stop_event.is_set():
+            return
         rel_path = os.path.relpath(event.src_path, ".")
         for d in self.ignore_dirs:
             if rel_path.startswith(d):
@@ -489,17 +492,17 @@ def lint(count):
 @click.option("--interval", default=60, help="Polling interval in seconds")
 def watch(interval):
     display_spinning_animation()
-    event_handler = ChangeHandler(ignore_dirs=[".git"])
+    stop_event = threading.Event()
+    event_handler = ChangeHandler(ignore_dirs=[".git"], stop_event=stop_event)
     observer = Observer()
     observer.schedule(event_handler, path=".", recursive=True)
     observer.start()
-
-    stop_event = threading.Event()
 
     def _handle_signal(signum, frame):
         if not stop_event.is_set():
             click.echo("\nStopping watch...")
             stop_event.set()
+            observer.stop()
 
     signal.signal(signal.SIGINT, _handle_signal)
     for sig_name in ("SIGTERM", "SIGQUIT"):
