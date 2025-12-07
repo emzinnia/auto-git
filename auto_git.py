@@ -106,6 +106,18 @@ def get_origin_repo_slug():
 
     return path
 
+def display_spinning_animation():
+    message = "Watching for changes... (Ctrl+C to stop)"
+    animation = "|/-\\"
+    spin_cycles = 24
+    for i in range(spin_cycles):
+        frame = animation[i % len(animation)]
+        sys.stdout.write(f"\r{message} {frame}")
+        sys.stdout.flush()
+        time.sleep(0.05)
+    sys.stdout.write(f"\r{message}    \n")
+    sys.stdout.flush()
+
 def lint_commit_dict(commit):
     ctype = commit.get("type")
     title = commit.get("title", "")
@@ -376,18 +388,6 @@ def lint(count):
             click.echo(f"  - {err}")
     else:
         click.echo(f"Last {len(lines)} commits pass lint")
-
-def display_spinning_animation():
-    message = "Watching for changes... (Ctrl+C to stop)"
-    animation = "|/-\\"
-    spin_cycles = 24
-    for i in range(spin_cycles):
-        frame = animation[i % len(animation)]
-        sys.stdout.write(f"\r{message} {frame}")
-        sys.stdout.flush()
-        time.sleep(0.05)
-    sys.stdout.write(f"\r{message}    \n")
-    sys.stdout.flush()
 
 @cli.command()
 @click.option("--interval", default=60, help="Polling interval in seconds")
