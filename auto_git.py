@@ -283,7 +283,7 @@ class ChangeHandler(FileSystemEventHandler):
 
         files = get_changed_files(staged=True, unstaged=False)
         if not files:
-            click.echo("No staged changes after add -A; skipping.")
+            display_spinning_animation("No changes found yet...")
             return
 
         diff = get_diff(files, staged=True, unstaged=False)
