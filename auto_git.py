@@ -272,6 +272,9 @@ def ask_openai_for_commits(files, diff):
            - Provide a short title (<75 chars), without the type prefix.
            - Provide a longer body description (can be multi-line, markdown ok).
            - List which files belong to that commit.
+           - Determine the type of commit based on the changes.
+           - Fixes should be a fix type, not a feat type.
+           - If the feature does not yet feel complete, ignore it and do not include it in the commit
         3. Properly determine the type of commit based on the changes.
             - feat: new feature or improvement
             - fix: bug fix
