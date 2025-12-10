@@ -71,3 +71,11 @@ auto-git generate --unstaged
 auto-git amend_unpushed --dry-run
 auto-git amend_unpushed --allow-dirty
 ```
+
+## Testing
+
+Run the test suite with:
+
+```
+pytest
+```

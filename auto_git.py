@@ -463,9 +463,24 @@ def rewrite_commits(amendments, allow_dirty=False):
 
 
 class ChangeHandler(FileSystemEventHandler):
-    def __init__(self, ignore_dirs=None, stop_event=None):
+    def __init__(self, ignore_dirs=None, stop_event=None, status_cooldown=5):
         self.ignore_dirs = ignore_dirs or []
         self.stop_event = stop_event
+        self.status_cooldown = status_cooldown
+        self._last_status_message = None
+        self._last_status_time = 0
+
+    def _show_status(self, message):
+        now = time.time()
+        if (
+            message == self._last_status_message
+            and (now - self._last_status_time) < self.status_cooldown
+        ):
+            return
+
+        self._last_status_message = message
+        self._last_status_time = now
+        display_spinning_animation(message)
 
     def on_any_event(self, event):
         if self.stop_event and self.stop_event.is_set():
@@ -476,14 +491,13 @@ class ChangeHandler(FileSystemEventHandler):
                 return
         if is_git_ignored(event.src_path):
             return
-
-        display_spinning_animation("Checking for changes...")
+        self._show_status("Checking for changes...")
         # Stage everything (we then split by AI into multiple commits)
         run("git add -A")
 
         files = get_changed_files(staged=True, unstaged=False)
         if not files:
-            display_spinning_animation("No changes found yet...")
+            self._show_status("No changes found yet...")
             return
 
         diff = get_diff(files, staged=True, unstaged=False)
@@ -657,7 +671,13 @@ def lint(count):
         click.echo(f"Last {len(lines)} commits pass lint")
 
 @cli.command()
-@click.option("--interval", default=60, help="Polling interval in seconds")
+@click.option(
+    "--interval",
+    default=300,
+    show_default=True,
+    type=int,
+    help="Polling interval in seconds (default is 5 minutes)",
+)
 def watch(interval):
     display_spinning_animation()
     stop_event = threading.Event()
@@ -665,6 +685,8 @@ def watch(interval):
     observer = Observer()
     observer.schedule(event_handler, path=".", recursive=True)
     observer.start()
+
+    interval_seconds = max(1, interval)
 
     def _handle_signal(signum, frame):
         if not stop_event.is_set():
@@ -681,7 +703,7 @@ def watch(interval):
     try:
         # Use stop_event.wait so Ctrl+C/signal stops promptly without waiting full interval
         while not stop_event.is_set():
-            stop_event.wait(interval)
+            stop_event.wait(interval_seconds)
     except KeyboardInterrupt:
         _handle_signal(signal.SIGINT, None)
     finally:

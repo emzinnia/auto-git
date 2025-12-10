@@ -3,4 +3,6 @@ openai
 requests
 watchdog
 urllib3
+pytest
+pytest-mock
 
