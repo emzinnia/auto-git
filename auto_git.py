@@ -5,6 +5,7 @@ import time
 import subprocess
 import sys
 import signal
+import shlex
 import threading
 from textwrap import dedent
 
@@ -30,12 +31,128 @@ COMMIT_SUBJECT_RE = re.compile(
 OPENAI_MODEL_COMMITS = "gpt-4.1"
 OPENAI_MODEL_PR = "gpt-4.1-mini"
 
+FIX_PROMPT_INSTRUCTIONS = dedent("""
+# Instructions for Rewriting a Local Git Commit Tree into Clean JSON
+
+Analyze the **un-pushed local commit tree** and return a rewritten, improved commit history in **JSON only** (no commentary).
+
+You will receive an ordered list of commits (oldest → newest), each containing a hash, message, and full diff.
+
+---
+
+## What You Must Do
+
+### 1. Understand the Commit Series
+
+- Interpret the diffs to infer *intent*, not just mechanical changes.
+- Identify categories: feature, bugfix, refactor, styling, docs, infra.
+- Detect noisy / meaningless commits (debug logs, accidental files, local undo commits).
+
+### 2. Rewrite the Commit History
+
+Produce a new commit history that is:
+
+- **Clean** — each commit has a single purpose.
+- **Logical** — flows in a coherent order.
+- **Minimal** — contains no unnecessary commits.
+- **Grouped by intent**, not by how the developer initially committed.
+
+You may:
+
+- **Squash** multiple commits into one if they represent one logical change.
+- **Split** a commit if it mixes unrelated modifications.
+- **Reorder** commits to make the story clearer.
+- **Drop** commits that add no value or cancel each other out.
+
+### 3. Generate High-Quality Commit Metadata
+
+For each rewritten commit:
+
+- **Title**: ≤72 characters, imperative mood (“Add X”, “Fix Y”)
+- **Description**: optional, used only when necessary
+- **Changes** array: summarize each file and classify the change type
+- **Rationale**: why these changes belong together
+
+### 4. Specify the Overall Merge Strategy
+
+Choose one:
+`squash`, `reorder`, `split`, `drop`
+(You may use more than one but list the primary strategy.)
+
+### 5. Output Strictly as JSON
+
+Return only JSON matching this schema:
+
+```json
+{
+  "rewrittenCommits": [
+    {
+      "title": "Concise commit title",
+      "description": "Optional longer description",
+      "changes": [
+        {
+          "file": "path/to/file",
+          "summary": "Human-readable explanation of what changed",
+          "type": "add|remove|modify|refactor|rename"
+        }
+      ],
+      "rationale": "Why these changes logically belong in this commit"
+    }
+  ],
+  "mergeStrategy": "squash|reorder|split|drop",
+  "notes": "Optional additional recommendations"
+}
+```
+
+### 6. Important Constraints
+
+* Do **not** return Git commands.
+* Do **not** reference AI tools or rewriting.
+* Do **not** include any explanatory text outside the JSON.
+* Output must represent the **final, cleaned commit tree**, not a one-to-one transformation.
+
+---
+
+## Final Output Template
+
+Use this exact structure:
+
+```json
+{
+  "rewrittenCommits": [
+    {
+      "title": "",
+      "description": "",
+      "changes": [
+        {
+          "file": "",
+          "summary": "",
+          "type": ""
+        }
+      ],
+      "rationale": ""
+    }
+  ],
+  "mergeStrategy": "",
+  "notes": ""
+}
+```
+""").strip()
+
 def run(cmd):
     return subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
 
 def get_upstream_ref():
+    """
+    Return the upstream ref if present; suppress git stderr noise when absent.
+    """
     try:
-        return run("git rev-parse --abbrev-ref --symbolic-full-name @{u}")
+        out = subprocess.check_output(
+            "git rev-parse --abbrev-ref --symbolic-full-name @{u}",
+            shell=True,
+            stderr=subprocess.DEVNULL,
+        )
+        return out.decode("utf-8").strip()
     except subprocess.CalledProcessError:
         return None
 
@@ -69,6 +186,52 @@ def get_unpushed_commits(max_count=20):
             continue
         sha, subj, body = record.split("\x1f", 2)
         commits.append({"sha": sha, "subject": subj.strip(), "body": body.strip()})
+    return source_desc, commits
+
+def get_commits_for_fix(max_count=20, force=False):
+    upstream = get_upstream_ref()
+    log_format = "%H%x1f%s%x1f%b%x1e"
+
+    if upstream and not force:
+        rev_range = f"{upstream}..HEAD"
+        source_desc = f"unpushed commits ({rev_range})"
+        log_cmd = f'git log --reverse --first-parent --format="{log_format}" {rev_range}'
+    else:
+        source_desc = f"last {max_count} commits"
+        if force and upstream:
+            source_desc += " (force enabled)"
+        elif not upstream:
+            source_desc += " (no upstream found)"
+        log_cmd = f'git log --reverse --first-parent -n {max_count} --format="{log_format}" HEAD'
+
+    raw = run(log_cmd)
+    commits = []
+    for record in raw.split("\x1e"):
+        if not record.strip():
+            continue
+        record = record.strip()
+        parts = record.split("\x1f")
+        if len(parts) < 2:
+            click.secho(f"Skipping malformed commit record: {record}", fg="yellow")
+            continue
+        sha = parts[0].strip()
+        subj = parts[1].strip()
+        body = parts[2].strip() if len(parts) > 2 else ""
+
+        message = subj
+        if body:
+            message = f"{message}\n\n{body}"
+
+        try:
+            diff = run(f"git show {sha} --format=format:")
+        except subprocess.CalledProcessError as exc:
+            decoded = exc.output.decode("utf-8", errors="ignore") if isinstance(exc.output, (bytes, bytearray)) else str(exc.output or "")
+            click.secho(f"Skipping commit {sha}: git show failed", fg="yellow")
+            if decoded:
+                click.echo(decoded)
+            continue
+
+        commits.append({"hash": sha, "message": message, "diff": diff})
     return source_desc, commits
 
 def is_tracked(path):
@@ -345,6 +508,105 @@ def ask_openai_for_amendments(commits):
         _ = lint_git_commit_subject(a.get("subject", ""))
     return amendments
 
+def ask_openai_for_fix(commits):
+    client = get_openai_client()
+    prompt = dedent(f"""
+    {FIX_PROMPT_INSTRUCTIONS}
+
+    Commits (oldest to newest):
+    {json.dumps(commits, indent=2)}
+    """)
+
+    response = client.responses.create(model=OPENAI_MODEL_COMMITS, input=prompt)
+    raw_text = response.output_text
+    return parse_json_from_openai_response(raw_text)
+
+
+def apply_fix_plan(commits, plan):
+    """
+    Apply the AI rewrite plan to the current commit range.
+
+    Supported scenarios:
+    - mergeStrategy == "drop" and no rewritten commits: drop the range.
+    - mergeStrategy == "squash" OR single rewritten commit: squash range to one commit.
+    - Equal commit counts: rewrite commit messages (same order/trees).
+
+    Unsupported (will abort): split/reorder where counts differ.
+    """
+    status = run("git status --porcelain")
+    if status.strip():
+        raise RuntimeError("Working tree not clean; commit or stash changes first.")
+
+    rewritten = plan.get("rewrittenCommits") or []
+    merge_strategy = (plan.get("mergeStrategy") or "").strip().lower()
+
+    if not commits:
+        return "noop"
+
+    first_sha = commits[0]["hash"]
+    parents_raw = run(f"git show -s --format=%P {first_sha}")
+    parents = parents_raw.split()
+    base_parent = parents[0] if parents else None
+
+    # Refuse to rewrite merge history
+    upstream = get_upstream_ref()
+    if upstream:
+        rev_range = f"{upstream}..HEAD"
+    else:
+        rev_range = f"{base_parent or ''}..{commits[-1]['hash']}"
+    merges = run(f"git rev-list --merges --first-parent {rev_range}")
+    if merges.strip():
+        raise RuntimeError("History contains merges; linear rewrite only. Aborting.")
+
+    def _commit_tree(tree_sha, parent_sha, title, body):
+        if not title or not title.strip():
+            raise RuntimeError("Rewrite plan provided an empty commit title.")
+        cmd_parts = ["git", "commit-tree", tree_sha]
+        if parent_sha:
+            cmd_parts.extend(["-p", parent_sha])
+        cmd_parts.extend(["-m", shlex.quote(title.strip())])
+        if body and body.strip():
+            cmd_parts.extend(["-m", shlex.quote(body.strip())])
+        return run(" ".join(cmd_parts))
+
+    # Handle drop
+    if merge_strategy == "drop" and not rewritten:
+        if not base_parent:
+            raise RuntimeError("Cannot drop range without a parent commit.")
+        run(f"git reset --hard {base_parent}")
+        return "dropped"
+
+    # Handle squash (or single rewrite entry)
+    if merge_strategy == "squash" or len(rewritten) == 1:
+        entry = rewritten[0] if rewritten else {"title": "Rewrite commits", "description": ""}
+        title = entry.get("title") or "Rewrite commits"
+        body = entry.get("description") or ""
+        tree_sha = run("git show -s --format=%T HEAD")
+        new_sha = _commit_tree(tree_sha, base_parent, title, body)
+        run(f"git reset --hard {new_sha}")
+        return "squashed"
+
+    # If counts differ, we cannot safely rewrite (split/reorder unsupported).
+    if len(rewritten) != len(commits):
+        raise RuntimeError(
+            f"Rewrite plan has {len(rewritten)} commits but history has {len(commits)}; "
+            "split/reorder not supported automatically. Please rerun with a compatible plan."
+        )
+
+    # Rewrite messages with same trees/order
+    last_new = base_parent
+    for entry, orig in zip(rewritten, commits):
+        title = (entry.get("title") or "").strip()
+        body = (entry.get("description") or "").strip()
+        tree_sha = run(f"git show -s --format=%T {orig['hash']}")
+        last_new = _commit_tree(tree_sha, last_new, title, body)
+
+    if not last_new:
+        raise RuntimeError("Failed to compute new commit chain.")
+
+    run(f"git reset --hard {last_new}")
+    return "rewritten"
+
 def apply_commits(commit_list):
     committed_subjects = []
     for commit in commit_list:
@@ -451,10 +713,9 @@ def rewrite_commits(amendments, allow_dirty=False):
         cmd_parts = ["git", "commit-tree", tree]
         if last_new:
             cmd_parts.extend(["-p", last_new])
-        cmd_parts.extend(["-m", subject])
+        cmd_parts.extend(["-m", shlex.quote(subject)])
         if body:
-            cmd_parts.extend(["-m", body])
-
+            cmd_parts.extend(["-m", shlex.quote(body)])
         new_sha = run(" ".join(cmd_parts))
         last_new = new_sha
 
@@ -638,6 +899,46 @@ def amend_unpushed(max_count, dry_run, allow_dirty):
         click.echo("Remember to push with --force-with-lease to update remote history.")
     except Exception as exc:  # noqa: BLE001
         click.secho(f"Amend failed: {exc}", fg="red")
+
+@cli.command()
+@click.option("--force", is_flag=True, help="Include pushed commits as well (limits to last N).")
+@click.option(
+    "--max-count",
+    default=20,
+    show_default=True,
+    type=int,
+    help="Maximum commits to include when no upstream or when forcing.",
+)
+def fix(force, max_count):
+    """
+    Ask OpenAI for a rewritten commit plan for the local history and apply it.
+    """
+    _, commits = get_commits_for_fix(max_count=max_count, force=force)
+    if not commits:
+        click.echo("No commits to process.")
+        return
+
+    if not force and not get_upstream_ref():
+        click.secho(f"No upstream detected; using {len(commits)} commit(s) from local history.", fg="yellow", err=True)
+    if force and get_upstream_ref():
+        click.secho("Force enabled; including pushed commits from local history.", fg="yellow", err=True)
+
+    try:
+        rewrite_plan = ask_openai_for_fix(commits)
+    except Exception as exc:  # noqa: BLE001
+        click.secho(f"Failed to get rewrite plan: {exc}", fg="red")
+        return
+
+    click.echo(json.dumps(rewrite_plan, indent=2))
+
+    try:
+        result = apply_fix_plan(commits, rewrite_plan)
+    except Exception as exc:  # noqa: BLE001
+        click.secho(f"Failed to apply rewrite plan: {exc}", fg="red")
+        return
+
+    click.secho(f"History updated ({result}).", fg="green", bold=True)
+    click.echo("Remember to push with --force-with-lease if you had pushed these commits previously.")
 
 @cli.command()
 def status():
