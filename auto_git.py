@@ -1,21 +1,20 @@
+import json
 import os
 import re
-import json
-import time
-import subprocess
-import sys
-import signal
 import shlex
+import signal
+import subprocess
 import threading
+import time
+import warnings
 from textwrap import dedent
 
 import click
 import openai
-import requests
-from watchdog.observers import Observer
+import urllib3
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
-import warnings, urllib3
 warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
 
 __version__ = "0.1.0"
@@ -279,7 +278,7 @@ def get_changed_files(staged=False, unstaged=False, untracked=False, untracked_f
         out = run("git diff --cached --name-only")
         if out:
             files.extend(out.splitlines())
-    
+
     if unstaged:
         out = run("git diff --name-only")
         if out:
@@ -293,16 +292,16 @@ def get_changed_files(staged=False, unstaged=False, untracked=False, untracked_f
         for f in untracked_files:
             if f and f not in files:
                 files.append(f)
-    
+
     return files
 
 def get_diff(files, staged=False, unstaged=False, untracked_files=None):
     diff_parts = []
 
     if staged and files:
-        diff_parts.append(f"git diff --cached -- " + " ".join(files))
+        diff_parts.append("git diff --cached -- " + " ".join(files))
     if unstaged and files:
-        diff_parts.append(f"git diff -- " + " ".join(files))
+        diff_parts.append("git diff -- " + " ".join(files))
     if untracked_files:
         for f in untracked_files:
             diff_parts.append(f"git diff --no-index -- /dev/null {f}")
@@ -321,10 +320,10 @@ def get_origin_repo_slug():
         path = "/".join(parts[-2:])
     else:
         path = url
-    
+
     if path.endswith(".git"):
         path = path[:-4]
-    
+
     if "/" not in path:
         raise RuntimeError(f"Could not determine repo slug from URL: {url}")
 
@@ -347,10 +346,10 @@ def lint_commit_dict(commit):
 
     if ctype not in COMMIT_TYPES:
         raise ValueError(f"Invalid commit type: {ctype}")
-    
+
     if not isinstance(title, str) or not title.strip():
         raise ValueError("Commit title is required")
-    
+
     if len(title) > 75:
         raise ValueError("Commit title must be less than 75 characters")
 
@@ -360,7 +359,7 @@ def lint_commit_dict(commit):
     subject = f"{ctype}: {title}"
     if not COMMIT_SUBJECT_RE.match(subject):
         raise ValueError("Commit title must match the format: <type>(<scope>): <subject>")
-    
+
     if body is not None and not isinstance(body, str):
         raise ValueError("Commit body must be a string")
 
@@ -799,7 +798,7 @@ def generate(staged, unstaged, untracked):
     if not files:
         click.echo("No changed files found")
         return
-    
+
     diff = get_diff(
         files,
         staged=staged,
@@ -807,7 +806,7 @@ def generate(staged, unstaged, untracked):
         untracked_files=untracked_files,
     )
     commits = ask_openai_for_commits(files, diff)
-    
+
     click.echo(json.dumps(commits, indent=2))
 
 @cli.command()
@@ -829,7 +828,7 @@ def commit(staged, unstaged, untracked, dry_run):
     if not files:
         click.echo("No changed files found")
         return
-    
+
     diff = get_diff(
         files,
         staged=staged,

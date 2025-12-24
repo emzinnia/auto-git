@@ -50,10 +50,10 @@ def get_origin_repo_slug():
         path = "/".join(parts[-2:])
     else:
         path = url
-    
+
     if path.endswith(".git"):
         path = path[:-4]
-    
+
     if "/" not in path:
         raise RuntimeError(f"Could not determine repo slug from URL: {url}")
 

@@ -12,6 +12,7 @@ help:
 	@echo "  make venv     - Create virtual environment"
 	@echo "  make deps     - Install dependencies"
 	@echo "  make dev      - Setup development environment (venv + deps)"
+	@echo "  make lint     - Run Ruff linting checks"
 	@echo "  make clean    - Remove venv and build artifacts"
 	@echo ""
 	@echo "Installation:"
@@ -30,6 +31,9 @@ deps: $(BIN)/activate
 dev: venv deps
 	@echo "Development environment ready"
 	@echo "Activate with: source $(VENV)/bin/activate"
+
+lint: deps
+	$(BIN)/ruff check .
 
 clean:
 	rm -rf $(VENV)

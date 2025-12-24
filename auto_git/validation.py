@@ -1,6 +1,6 @@
 """Linting and validation functions for commits."""
 
-from .config import COMMIT_TYPES, COMMIT_SUBJECT_RE
+from .config import COMMIT_SUBJECT_RE, COMMIT_TYPES
 
 
 def lint_commit_dict(commit):
@@ -16,10 +16,10 @@ def lint_commit_dict(commit):
 
     if ctype not in COMMIT_TYPES:
         raise ValueError(f"Invalid commit type: {ctype}")
-    
+
     if not isinstance(title, str) or not title.strip():
         raise ValueError("Commit title is required")
-    
+
     if len(title) > 75:
         raise ValueError("Commit title must be less than 75 characters")
 
@@ -29,7 +29,7 @@ def lint_commit_dict(commit):
     subject = f"{ctype}: {title}"
     if not COMMIT_SUBJECT_RE.match(subject):
         raise ValueError("Commit title must match the format: <type>(<scope>): <subject>")
-    
+
     if body is not None and not isinstance(body, str):
         raise ValueError("Commit body must be a string")
 

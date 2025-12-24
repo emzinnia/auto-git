@@ -1,6 +1,7 @@
 """Display utilities and UI helpers."""
 
 import time
+
 import click
 
 

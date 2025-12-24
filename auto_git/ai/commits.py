@@ -2,11 +2,11 @@
 
 import json
 
-from .client import get_openai_client, parse_json_from_openai_response
-from .prompts import FIX_PROMPT_INSTRUCTIONS, COMMIT_GENERATION_PROMPT, AMENDMENT_PROMPT
 from ..config import OPENAI_MODEL_COMMITS
 from ..ui import display_spinning_animation
 from ..validation import lint_commit_dict, lint_git_commit_subject
+from .client import get_openai_client, parse_json_from_openai_response
+from .prompts import AMENDMENT_PROMPT, COMMIT_GENERATION_PROMPT, FIX_PROMPT_INSTRUCTIONS
 
 
 def ask_openai_for_commits(files, diff):

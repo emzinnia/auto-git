@@ -8,26 +8,21 @@ import click
 from watchdog.observers import Observer
 
 from .config import __version__
+from .git import (
+    apply_commits,
+    apply_fix_plan,
+    get_changed_files,
+    get_commits_for_fix,
+    get_commits_since_push,
+    get_diff,
+    get_unpushed_commits,
+    get_untracked_files,
+    get_upstream_ref,
+    rewrite_commits,
+    run,
+)
 from .ui import display_spinning_animation, format_commit_preview
 from .validation import lint_git_commit_subject
-from .git import (
-    run,
-    get_upstream_ref,
-    get_untracked_files,
-    get_changed_files,
-    get_diff,
-    get_commits_since_push,
-    get_unpushed_commits,
-    get_commits_for_fix,
-    apply_fix_plan,
-    apply_commits,
-    rewrite_commits,
-)
-from .ai import (
-    ask_openai_for_commits,
-    ask_openai_for_amendments,
-    ask_openai_for_fix,
-)
 from .watcher import ChangeHandler
 
 
@@ -59,7 +54,7 @@ def generate(staged, unstaged, untracked):
     if not files:
         click.echo("No changed files found")
         return
-    
+
     diff = get_diff(
         files,
         staged=staged,
@@ -67,7 +62,7 @@ def generate(staged, unstaged, untracked):
         untracked_files=untracked_files,
     )
     commits = ag.ask_openai_for_commits(files, diff)
-    
+
     click.echo(json.dumps(commits, indent=2))
 
 
@@ -93,7 +88,7 @@ def commit(staged, unstaged, untracked, dry_run):
     if not files:
         click.echo("No changed files found")
         return
-    
+
     diff = get_diff(
         files,
         staged=staged,

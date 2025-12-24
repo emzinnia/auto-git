@@ -1,13 +1,11 @@
 """Auto-git: AI-powered git commit automation."""
 
 import warnings
+
 import urllib3
 
 # Suppress urllib3 warnings about OpenSSL
 warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
-
-from .config import __version__
-from .cli import cli, main
 
 # Re-export the public API for library-style usage (and tests).
 from .ai import (  # noqa: F401
@@ -17,6 +15,8 @@ from .ai import (  # noqa: F401
     get_openai_client,
     parse_json_from_openai_response,
 )
+from .cli import cli, main
+from .config import __version__
 from .git import (  # noqa: F401
     apply_commits,
     apply_fix_plan,

@@ -6,8 +6,8 @@ import subprocess
 
 import click
 
-from .core import run, get_upstream_ref, is_tracked
 from ..validation import lint_commit_dict
+from .core import get_upstream_ref, is_tracked, run
 
 
 def get_commits_since_push(fallback_count=10):
@@ -212,9 +212,7 @@ def apply_commits(commit_list):
     
     Each commit dict should have: type, title, body (optional), files
     """
-    from .diff import get_diff
-    from ..ui import display_spinning_animation
-    
+
     committed_subjects = []
     for commit in commit_list:
         files = commit.get("files", [])

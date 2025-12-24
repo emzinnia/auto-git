@@ -1,7 +1,7 @@
 """OpenAI client setup and connection utilities."""
 
-import os
 import json
+import os
 import re
 
 import openai

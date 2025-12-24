@@ -1,13 +1,14 @@
 """File system watcher for automatic commits."""
 
-import time
 import threading
+import time
 
 from watchdog.events import FileSystemEventHandler
 
+
 class ChangeHandler(FileSystemEventHandler):
     """Handler for file system change events that triggers AI commits."""
-    
+
     def __init__(
         self,
         ignore_dirs=None,
@@ -134,8 +135,9 @@ class ChangeHandler(FileSystemEventHandler):
 
     def on_any_event(self, event):
         import os
+
         import auto_git as ag
-        
+
         if self.stop_event and self.stop_event.is_set():
             return
         rel_path = os.path.relpath(event.src_path, ".")
