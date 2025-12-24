@@ -278,12 +278,15 @@ def watch(interval):
     """Watch for file changes and auto-commit."""
     display_spinning_animation()
     stop_event = threading.Event()
-    event_handler = ChangeHandler(ignore_dirs=[".git"], stop_event=stop_event)
+    interval_seconds = max(1, interval)
+    event_handler = ChangeHandler(
+        ignore_dirs=[".git"],
+        stop_event=stop_event,
+        interval_seconds=interval_seconds,
+    )
     observer = Observer()
     observer.schedule(event_handler, path=".", recursive=True)
     observer.start()
-
-    interval_seconds = max(1, interval)
 
     def _handle_signal(signum, frame):
         if not stop_event.is_set():

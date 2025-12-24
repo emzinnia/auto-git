@@ -92,3 +92,56 @@ def test_change_handler_stages_when_not_ignored(monkeypatch, tmp_path):
     handler.on_any_event(event)
     assert any("git add -A" in c for c in calls)
 
+
+def test_change_handler_debounces_with_interval(monkeypatch, tmp_path):
+    calls = []
+    scheduled = []
+
+    class FakeTimer:
+        def __init__(self, interval, func):
+            self.interval = interval
+            self.func = func
+            self._alive = False
+            self.daemon = False
+
+        def start(self):
+            self._alive = True
+            scheduled.append(self)
+
+        def is_alive(self):
+            return self._alive
+
+    now = [100.0]
+
+    def clock():
+        return now[0]
+
+    handler = ag.ChangeHandler(
+        ignore_dirs=[],
+        status_cooldown=0,
+        interval_seconds=10,
+        clock=clock,
+        timer_factory=FakeTimer,
+    )
+    monkeypatch.setattr(ag, "is_git_ignored", lambda path: False)
+    monkeypatch.setattr(ag, "run", lambda cmd: calls.append(cmd))
+    monkeypatch.setattr(ag, "display_spinning_animation", lambda *a, **k: None)
+    monkeypatch.setattr(
+        ag,
+        "get_changed_files",
+        lambda staged=False, unstaged=False, untracked=False, untracked_files=None: [],
+    )
+
+    event = SimpleNamespace(src_path=str(tmp_path / "file.py"))
+    handler.on_any_event(event)
+    handler.on_any_event(event)  # should coalesce into same scheduled run
+
+    assert not any("git add -A" in c for c in calls)
+    assert len(scheduled) == 1
+    assert int(scheduled[0].interval) == 10
+
+    # Fire the scheduled timer after the interval.
+    now[0] = 111.0
+    scheduled[0].func()
+    assert any("git add -A" in c for c in calls)
+
