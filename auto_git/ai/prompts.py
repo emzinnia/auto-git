@@ -80,6 +80,7 @@ Return only JSON matching this schema:
 * Do **not** return Git commands.
 * Do **not** reference AI tools or rewriting.
 * Do **not** include any explanatory text outside the JSON.
+* Do **not** hallucinate or make up information. It should all be based on the diffs provided.
 * Output must represent the **final, cleaned commit tree**, not a one-to-one transformation.
 
 ---
