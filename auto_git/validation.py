@@ -6,7 +6,7 @@ from .config import COMMIT_SUBJECT_RE, COMMIT_TYPES
 def lint_commit_dict(commit):
     """
     Validate a commit dictionary and return the formatted subject line.
-    
+
     Raises ValueError if validation fails.
     """
     ctype = commit.get("type")
@@ -39,7 +39,7 @@ def lint_commit_dict(commit):
 def lint_git_commit_subject(subject):
     """
     Validate a git commit subject line.
-    
+
     Raises ValueError if validation fails.
     """
     if not COMMIT_SUBJECT_RE.match(subject):

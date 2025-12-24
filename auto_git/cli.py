@@ -201,9 +201,17 @@ def fix(force, max_count):
         return
 
     if not force and not get_upstream_ref():
-        click.secho(f"No upstream detected; using {len(commits)} commit(s) from local history.", fg="yellow", err=True)
+        click.secho(
+            f"No upstream detected; using {len(commits)} commit(s) from local history.",
+            fg="yellow",
+            err=True,
+        )
     if force and get_upstream_ref():
-        click.secho("Force enabled; including pushed commits from local history.", fg="yellow", err=True)
+        click.secho(
+            "Force enabled; including pushed commits from local history.",
+            fg="yellow",
+            err=True,
+        )
 
     try:
         rewrite_plan = ag.ask_openai_for_fix(commits)
@@ -220,7 +228,9 @@ def fix(force, max_count):
         return
 
     click.secho(f"History updated ({result}).", fg="green", bold=True)
-    click.echo("Remember to push with --force-with-lease if you had pushed these commits previously.")
+    click.echo(
+        "Remember to push with --force-with-lease if you had pushed these commits previously."
+    )
 
 
 @cli.command()

@@ -14,13 +14,13 @@ def get_untracked_files():
 def get_changed_files(staged=False, unstaged=False, untracked=False, untracked_files=None):
     """
     Get list of changed files based on specified criteria.
-    
+
     Args:
         staged: Include staged changes
         unstaged: Include unstaged changes
         untracked: Include untracked files
         untracked_files: Pre-computed list of untracked files (optional)
-    
+
     Returns:
         List of file paths
     """
@@ -51,13 +51,13 @@ def get_changed_files(staged=False, unstaged=False, untracked=False, untracked_f
 def get_diff(files, staged=False, unstaged=False, untracked_files=None):
     """
     Get the diff for specified files.
-    
+
     Args:
         files: List of file paths
         staged: Include staged diff
         unstaged: Include unstaged diff
         untracked_files: List of untracked files to include
-    
+
     Returns:
         Combined diff string
     """

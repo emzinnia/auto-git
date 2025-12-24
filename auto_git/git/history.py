@@ -13,7 +13,7 @@ from .core import get_upstream_ref, is_tracked, run
 def get_commits_since_push(fallback_count=10):
     """
     Get commit subjects since last push to upstream.
-    
+
     Returns:
         Tuple of (source_description, list_of_subjects)
     """
@@ -26,14 +26,14 @@ def get_commits_since_push(fallback_count=10):
         source_desc = f"last {fallback_count} commits (no upstream found)"
 
     log_output = run(log_cmd)
-    lines = [l for l in log_output.splitlines() if l.strip()]
+    lines = [line for line in log_output.splitlines() if line.strip()]
     return source_desc, lines
 
 
 def get_unpushed_commits(max_count=20):
     """
     Get unpushed commits with their details.
-    
+
     Returns:
         Tuple of (source_description, list_of_commit_dicts)
     """
@@ -66,11 +66,11 @@ def get_unpushed_commits(max_count=20):
 def get_commits_for_fix(max_count=20, force=False):
     """
     Get commits with full diffs for the fix command.
-    
+
     Args:
         max_count: Maximum number of commits to retrieve
         force: If True, include pushed commits as well
-    
+
     Returns:
         Tuple of (source_description, list_of_commit_dicts_with_diffs)
     """
@@ -110,7 +110,11 @@ def get_commits_for_fix(max_count=20, force=False):
         try:
             diff = run(f"git show {sha} --format=format:")
         except subprocess.CalledProcessError as exc:
-            decoded = exc.output.decode("utf-8", errors="ignore") if isinstance(exc.output, (bytes, bytearray)) else str(exc.output or "")
+            err_out = exc.output
+            if isinstance(err_out, (bytes, bytearray)):
+                decoded = err_out.decode("utf-8", errors="ignore")
+            else:
+                decoded = str(err_out or "")
             click.secho(f"Skipping commit {sha}: git show failed", fg="yellow")
             if decoded:
                 click.echo(decoded)
@@ -193,7 +197,7 @@ def apply_fix_plan(commits, plan):
 
     # Rewrite messages with same trees/order
     last_new = base_parent
-    for entry, orig in zip(rewritten, commits):
+    for entry, orig in zip(rewritten, commits, strict=True):
         title = (entry.get("title") or "").strip()
         body = (entry.get("description") or "").strip()
         tree_sha = run(f"git show -s --format=%T {orig['hash']}")
@@ -209,7 +213,7 @@ def apply_fix_plan(commits, plan):
 def apply_commits(commit_list):
     """
     Apply a list of commit dictionaries by staging files and committing.
-    
+
     Each commit dict should have: type, title, body (optional), files
     """
 
@@ -251,7 +255,10 @@ def apply_commits(commit_list):
             run(["git", "add", "-A", "--", *stage_targets])
         except subprocess.CalledProcessError as exc:
             err_out = exc.output
-            decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
+            if isinstance(err_out, (bytes, bytearray)):
+                decoded = err_out.decode("utf-8", errors="ignore")
+            else:
+                decoded = str(err_out or "")
             click.secho(
                 f"Staging failed for files: {', '.join(stage_targets)}; skipping this commit.",
                 fg="red",
@@ -269,7 +276,10 @@ def apply_commits(commit_list):
             committed_subjects.append(subject)
         except subprocess.CalledProcessError as exc:
             err_out = exc.output
-            decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
+            if isinstance(err_out, (bytes, bytearray)):
+                decoded = err_out.decode("utf-8", errors="ignore")
+            else:
+                decoded = str(err_out or "")
             click.secho("Commit failed; skipping remaining steps for this commit.", fg="red")
             if decoded:
                 click.echo(decoded)
@@ -295,17 +305,19 @@ def apply_commits(commit_list):
 def rewrite_commits(amendments, allow_dirty=False):
     """
     Rewrite commit messages for a list of amendments.
-    
+
     Args:
         amendments: List of dicts with sha, subject, body
         allow_dirty: Allow running with dirty working tree
-    
+
     Returns:
         The new HEAD sha, or None if no amendments
     """
     status = run("git status --porcelain")
     if status.strip() and not allow_dirty:
-        raise RuntimeError("Working tree not clean; commit or stash before rewriting, or pass allow_dirty=True")
+        raise RuntimeError(
+            "Working tree not clean; commit or stash before rewriting, or pass allow_dirty=True"
+        )
 
     if not amendments:
         return None

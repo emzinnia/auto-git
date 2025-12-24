@@ -12,11 +12,11 @@ from .prompts import AMENDMENT_PROMPT, COMMIT_GENERATION_PROMPT, FIX_PROMPT_INST
 def ask_openai_for_commits(files, diff):
     """
     Ask OpenAI to generate commit messages based on files and diff.
-    
+
     Args:
         files: List of file paths
         diff: Diff string
-        
+
     Returns:
         List of commit dictionaries
     """
@@ -43,10 +43,10 @@ def ask_openai_for_commits(files, diff):
 def ask_openai_for_amendments(commits):
     """
     Ask OpenAI to propose amendments for existing commits.
-    
+
     Args:
         commits: List of commit dictionaries with sha, subject, body
-        
+
     Returns:
         List of amendment dictionaries
     """
@@ -69,15 +69,18 @@ def ask_openai_for_amendments(commits):
 def ask_openai_for_fix(commits):
     """
     Ask OpenAI for a rewritten commit plan.
-    
+
     Args:
         commits: List of commit dictionaries with hash, message, diff
-        
+
     Returns:
         Rewrite plan dictionary
     """
     client = get_openai_client()
-    prompt = f"{FIX_PROMPT_INSTRUCTIONS}\n\nCommits (oldest to newest):\n{json.dumps(commits, indent=2)}"
+    prompt = (
+        f"{FIX_PROMPT_INSTRUCTIONS}\n\nCommits (oldest to newest):\n"
+        f"{json.dumps(commits, indent=2)}"
+    )
 
     response = client.responses.create(model=OPENAI_MODEL_COMMITS, input=prompt)
     raw_text = response.output_text

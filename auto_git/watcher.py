@@ -106,6 +106,7 @@ class ChangeHandler(FileSystemEventHandler):
             self._timer = None
             self._next_run_time = None
 
+        should_stop = False
         try:
             self._show_status("Checking for changes...")
             # Stage everything (we then split by AI into multiple commits)
@@ -122,9 +123,8 @@ class ChangeHandler(FileSystemEventHandler):
         finally:
             with self._lock:
                 self._processing = False
-                if self.stop_event and self.stop_event.is_set():
-                    return
-                if self._pending:
+                should_stop = bool(self.stop_event and self.stop_event.is_set())
+                if self._pending and not should_stop:
                     # Coalesce further events into the next interval window.
                     if self.interval_seconds > 0:
                         now = self._clock()
@@ -132,6 +132,8 @@ class ChangeHandler(FileSystemEventHandler):
                         self._schedule_locked(max(0.0, self._next_run_time - now))
                     else:
                         self._schedule_locked(0.0)
+        if should_stop:
+            return
 
     def on_any_event(self, event):
         import os

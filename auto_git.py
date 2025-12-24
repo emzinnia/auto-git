@@ -33,9 +33,11 @@ OPENAI_MODEL_PR = "gpt-4.1-mini"
 FIX_PROMPT_INSTRUCTIONS = dedent("""
 # Instructions for Rewriting a Local Git Commit Tree into Clean JSON
 
-Analyze the **un-pushed local commit tree** and return a rewritten, improved commit history in **JSON only** (no commentary).
+Analyze the **un-pushed local commit tree** and return a rewritten, improved commit history
+in **JSON only** (no commentary).
 
-You will receive an ordered list of commits (oldest → newest), each containing a hash, message, and full diff.
+You will receive an ordered list of commits (oldest → newest), each containing a hash,
+message, and full diff.
 
 ---
 
@@ -176,7 +178,7 @@ def get_commits_since_push(fallback_count=10):
         source_desc = f"last {fallback_count} commits (no upstream found)"
 
     log_output = run(log_cmd)
-    lines = [l for l in log_output.splitlines() if l.strip()]
+    lines = [line for line in log_output.splitlines() if line.strip()]
     return source_desc, lines
 
 def get_unpushed_commits(max_count=20):
@@ -235,7 +237,11 @@ def get_commits_for_fix(max_count=20, force=False):
         try:
             diff = run(f"git show {sha} --format=format:")
         except subprocess.CalledProcessError as exc:
-            decoded = exc.output.decode("utf-8", errors="ignore") if isinstance(exc.output, (bytes, bytearray)) else str(exc.output or "")
+            err_out = exc.output
+            if isinstance(err_out, (bytes, bytearray)):
+                decoded = err_out.decode("utf-8", errors="ignore")
+            else:
+                decoded = str(err_out or "")
             click.secho(f"Skipping commit {sha}: git show failed", fg="yellow")
             if decoded:
                 click.echo(decoded)
@@ -447,7 +453,8 @@ def ask_openai_for_commits(files, diff):
            - List which files belong to that commit.
            - Determine the type of commit based on the changes.
            - Fixes should be a fix type, not a feat type.
-           - If the feature does not yet feel complete, ignore it and do not include it in the commit
+           - If the feature does not yet feel complete, ignore it and do not include it
+             in the commit
         3. Properly determine the type of commit based on the changes.
             - feat: new feature or improvement
             - fix: bug fix
@@ -605,7 +612,7 @@ def apply_fix_plan(commits, plan):
 
     # Rewrite messages with same trees/order
     last_new = base_parent
-    for entry, orig in zip(rewritten, commits):
+    for entry, orig in zip(rewritten, commits, strict=True):
         title = (entry.get("title") or "").strip()
         body = (entry.get("description") or "").strip()
         tree_sha = run(f"git show -s --format=%T {orig['hash']}")
@@ -656,7 +663,10 @@ def apply_commits(commit_list):
             run(["git", "add", "-A", "--", *stage_targets])
         except subprocess.CalledProcessError as exc:
             err_out = exc.output
-            decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
+            if isinstance(err_out, (bytes, bytearray)):
+                decoded = err_out.decode("utf-8", errors="ignore")
+            else:
+                decoded = str(err_out or "")
             click.secho(
                 f"Staging failed for files: {', '.join(stage_targets)}; skipping this commit.",
                 fg="red",
@@ -674,7 +684,10 @@ def apply_commits(commit_list):
             committed_subjects.append(subject)
         except subprocess.CalledProcessError as exc:
             err_out = exc.output
-            decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
+            if isinstance(err_out, (bytes, bytearray)):
+                decoded = err_out.decode("utf-8", errors="ignore")
+            else:
+                decoded = str(err_out or "")
             click.secho("Commit failed; skipping remaining steps for this commit.", fg="red")
             if decoded:
                 click.echo(decoded)
@@ -700,7 +713,10 @@ def apply_commits(commit_list):
 def rewrite_commits(amendments, allow_dirty=False):
     status = run("git status --porcelain")
     if status.strip() and not allow_dirty:
-        raise RuntimeError("Working tree not clean; commit or stash before rewriting, or pass allow_dirty=True")
+        raise RuntimeError(
+            "Working tree not clean; commit or stash before rewriting, "
+            "or pass allow_dirty=True"
+        )
 
     if not amendments:
         return None
@@ -926,9 +942,17 @@ def fix(force, max_count):
         return
 
     if not force and not get_upstream_ref():
-        click.secho(f"No upstream detected; using {len(commits)} commit(s) from local history.", fg="yellow", err=True)
+        click.secho(
+            f"No upstream detected; using {len(commits)} commit(s) from local history.",
+            fg="yellow",
+            err=True,
+        )
     if force and get_upstream_ref():
-        click.secho("Force enabled; including pushed commits from local history.", fg="yellow", err=True)
+        click.secho(
+            "Force enabled; including pushed commits from local history.",
+            fg="yellow",
+            err=True,
+        )
 
     try:
         rewrite_plan = ask_openai_for_fix(commits)
@@ -945,7 +969,9 @@ def fix(force, max_count):
         return
 
     click.secho(f"History updated ({result}).", fg="green", bold=True)
-    click.echo("Remember to push with --force-with-lease if you had pushed these commits previously.")
+    click.echo(
+        "Remember to push with --force-with-lease if you had pushed these commits previously."
+    )
 
 @cli.command()
 def status():

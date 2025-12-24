@@ -5,9 +5,11 @@ from textwrap import dedent
 FIX_PROMPT_INSTRUCTIONS = dedent("""
 # Instructions for Rewriting a Local Git Commit Tree into Clean JSON
 
-Analyze the **un-pushed local commit tree** and return a rewritten, improved commit history in **JSON only** (no commentary).
+Analyze the **un-pushed local commit tree** and return a rewritten, improved commit history
+in **JSON only** (no commentary).
 
-You will receive an ordered list of commits (oldest → newest), each containing a hash, message, and full diff.
+You will receive an ordered list of commits (oldest → newest), each containing a hash,
+message, and full diff.
 
 ---
 

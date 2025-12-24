@@ -4,9 +4,6 @@ import warnings
 
 import urllib3
 
-# Suppress urllib3 warnings about OpenSSL
-warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
-
 # Re-export the public API for library-style usage (and tests).
 from .ai import (  # noqa: F401
     ask_openai_for_amendments,
@@ -36,6 +33,9 @@ from .git import (  # noqa: F401
 from .ui import display_spinning_animation, format_commit_preview  # noqa: F401
 from .validation import lint_commit_dict, lint_git_commit_subject  # noqa: F401
 from .watcher import ChangeHandler  # noqa: F401
+
+# Suppress urllib3 warnings about OpenSSL after imports are loaded.
+warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
 
 
 def get_origin_repo_slug():

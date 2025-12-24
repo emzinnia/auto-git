@@ -10,7 +10,7 @@ import openai
 def get_openai_client():
     """
     Get an OpenAI client, reading API key from environment or .env file.
-    
+
     Raises RuntimeError if no API key is found.
     """
     api_key = os.environ.get("OPEN_AI_API_KEY")
@@ -37,10 +37,10 @@ def get_openai_client():
 def parse_json_from_openai_response(text):
     """
     Parse JSON from an OpenAI response, handling markdown code blocks.
-    
+
     Args:
         text: Raw response text from OpenAI
-        
+
     Returns:
         Parsed JSON object
     """
