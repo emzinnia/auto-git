@@ -1,5 +1,7 @@
 # auto-git
 
+Update readme test.
+
 This is a simple tool I created and use to automatically create commit messages based off my current work tree.
 
 ## Obvious Disclaimer
