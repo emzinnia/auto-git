@@ -74,3 +74,19 @@ def test_amend_unpushed_dry_run(monkeypatch, tmp_git_repo, write_file):
     assert "first updated" in result.output
     assert "second updated" in result.output
 
+
+def test_apply_commits_stages_paths_with_parentheses(monkeypatch, tmp_git_repo, write_file):
+    repo, _git = tmp_git_repo
+    path = "src/routes/(app)/analytics/+page.svelte"
+    write_file(repo, path, "<h1>analytics</h1>")
+
+    monkeypatch.chdir(repo)
+
+    ag.apply_commits([{"type": "feat", "title": "add analytics page", "files": [path]}])
+
+    # Ensure the file ended up in the commit even though the path contains parentheses.
+    names = subprocess.check_output(
+        f'git -C "{repo}" show --name-only --pretty="" HEAD', shell=True, text=True
+    )
+    assert path in names.splitlines()
+

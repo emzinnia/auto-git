@@ -140,7 +140,19 @@ Use this exact structure:
 """).strip()
 
 def run(cmd):
-    return subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
+    """
+    Run a command and return stripped output.
+
+    Accepts either a string (split using shlex) or an argv list. We avoid invoking
+    a shell so file paths containing characters like '(' and ')' are handled
+    safely.
+    """
+    args = cmd if isinstance(cmd, (list, tuple)) else shlex.split(cmd)
+    return (
+        subprocess.check_output(args, stderr=subprocess.STDOUT)
+        .decode("utf-8", errors="ignore")
+        .strip()
+    )
 
 def get_upstream_ref():
     """
@@ -148,11 +160,10 @@ def get_upstream_ref():
     """
     try:
         out = subprocess.check_output(
-            "git rev-parse --abbrev-ref --symbolic-full-name @{u}",
-            shell=True,
+            ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
             stderr=subprocess.DEVNULL,
         )
-        return out.decode("utf-8").strip()
+        return out.decode("utf-8", errors="ignore").strip()
     except subprocess.CalledProcessError:
         return None
 
@@ -643,7 +654,7 @@ def apply_commits(commit_list):
 
         try:
             # Use -A to ensure deletions are staged too; plain git add errors on removed paths
-            run("git add -A -- " + " ".join(stage_targets))
+            run(["git", "add", "-A", "--", *stage_targets])
         except subprocess.CalledProcessError as exc:
             err_out = exc.output
             decoded = err_out.decode("utf-8", errors="ignore") if isinstance(err_out, (bytes, bytearray)) else str(err_out or "")
@@ -655,12 +666,9 @@ def apply_commits(commit_list):
                 click.echo(decoded)
             continue
 
-        # Escape double-quotes in body to avoid shell issues
-        safe_body = body.replace('"', '\\"')
-
-        cmd = f'git commit -m "{subject}"'
-        if safe_body.strip():
-            cmd += f' -m "{safe_body}"'
+        cmd = ["git", "commit", "-m", subject]
+        if body and body.strip():
+            cmd.extend(["-m", body])
 
         try:
             run(cmd)
