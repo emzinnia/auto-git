@@ -10,12 +10,22 @@ AI can make mistakes. Don't use this for your missile software.
 
 ### Requirements
 
-- Python 3.8 or newer
+- Python 3.11 or newer
 
-### Install Python dependencies
+### Install `uv` (recommended)
 
+`uv` is a fast Python package + project manager ([`astral-sh/uv`](https://github.com/astral-sh/uv)).
+
+Install with pip (or follow the official installer docs):
+
+```bash
+python -m pip install uv
 ```
-pip install -r requirements.txt
+
+### Install project dependencies
+
+```bash
+uv sync --all-groups
 ```
 
 ### Set An OpenAI API Key
@@ -25,26 +35,23 @@ pip install -r requirements.txt
 OPEN_AI_API_KEY=<your_key_here>
 ```
 
-### CLI install (optional, requires sudo)
+### CLI install (optional)
 
-To install the `auto-git` command globally (for all users):
+To install the `auto-git` command globally as a uv tool:
 
+```bash
+uv tool install --editable .
 ```
-sudo make install
-```
 
-This will symlink `auto_git.py` to `/usr/local/bin/auto-git` and make it executable.  
-Now you can run `auto-git` from anywhere.
+To uninstall:
 
-To uninstall the CLI:
-
-```
-sudo make uninstall
+```bash
+uv tool uninstall auto-git
 ```
 
 ## CLI
 
-Use via `python auto_git.py <command>` or, after `make install`, `auto-git <command>`.
+Use via `uv run auto-git <command>` (recommended), or after `uv tool install`, `auto-git <command>`.
 
 ### Commands
 
@@ -60,17 +67,17 @@ Use via `python auto_git.py <command>` or, after `make install`, `auto-git <comm
 
 ```bash
 # Preview proposed commits and diff (no writes)
-auto-git commit --dry-run --untracked
+uv run auto-git commit --dry-run --untracked
 
 # Apply commits for staged + unstaged changes (default)
-auto-git commit
+uv run auto-git commit
 
 # Just get the commit plan as JSON
-auto-git generate --unstaged
+uv run auto-git generate --unstaged
 
 # Rewrite unpushed commits after previewing
-auto-git amend_unpushed --dry-run
-auto-git amend_unpushed --allow-dirty
+uv run auto-git amend_unpushed --dry-run
+uv run auto-git amend_unpushed --allow-dirty
 ```
 
 ## Testing
@@ -78,5 +85,5 @@ auto-git amend_unpushed --allow-dirty
 Run the test suite with:
 
 ```
-pytest
+uv run pytest
 ```

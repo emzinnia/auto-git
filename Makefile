@@ -1,59 +1,46 @@
-.PHONY: help venv deps dev clean install uninstall
+.PHONY: help sync dev lint test clean run install uninstall
 
-PYTHON := python3.11
-VENV := venv
-BIN := $(VENV)/bin
-INSTALL_PATH := /usr/local/bin/auto-git
+UV ?= uv
 
 help:
 	@echo "auto-git - AI-powered Git commit message generator"
 	@echo ""
 	@echo "Development:"
-	@echo "  make venv     - Create virtual environment"
-	@echo "  make deps     - Install dependencies"
-	@echo "  make dev      - Setup development environment (venv + deps)"
+	@echo "  make sync     - Create/update .venv and install all deps via uv"
+	@echo "  make dev      - Alias for sync"
 	@echo "  make lint     - Run Ruff linting checks"
+	@echo "  make test     - Run tests"
+	@echo "  make run      - Run auto-git (help)"
 	@echo "  make clean    - Remove venv and build artifacts"
 	@echo ""
 	@echo "Installation:"
-	@echo "  make install   - Install auto-git command to $(INSTALL_PATH)"
-	@echo "  make uninstall - Remove auto-git from $(INSTALL_PATH)"
+	@echo "  make install   - Install the auto-git CLI as a uv tool"
+	@echo "  make uninstall - Uninstall the auto-git CLI uv tool"
 
-venv:
-	$(PYTHON) -m venv $(VENV)
-	@echo "Virtual environment created at $(VENV)/"
+sync:
+	$(UV) sync --all-groups
 
-deps: $(BIN)/activate
-	$(BIN)/pip install --upgrade pip
-	$(BIN)/pip install -r requirements.txt
-	@echo "Dependencies installed"
+dev: sync
 
-dev: venv deps
-	@echo "Development environment ready"
-	@echo "Activate with: source $(VENV)/bin/activate"
+lint:
+	$(UV) run ruff check .
 
-lint: deps
-	$(BIN)/ruff check .
+test:
+	$(UV) run pytest
+
+run:
+	$(UV) run auto-git --help
 
 clean:
-	rm -rf $(VENV)
+	rm -rf .venv
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "Cleaned up"
 
-install: deps
-	@echo "Installing auto-git to $(INSTALL_PATH)..."
-	@echo '#!/bin/bash' | sudo tee $(INSTALL_PATH) > /dev/null
-	@echo 'source "$(CURDIR)/$(BIN)/activate"' | sudo tee -a $(INSTALL_PATH) > /dev/null
-	@echo 'python "$(CURDIR)/auto_git.py" "$$@"' | sudo tee -a $(INSTALL_PATH) > /dev/null
-	sudo chmod +x $(INSTALL_PATH)
+install:
+	$(UV) tool install --editable .
 	@echo "Installed! Run 'auto-git --help' to get started"
 
 uninstall:
-	@if [ -f $(INSTALL_PATH) ]; then \
-		sudo rm $(INSTALL_PATH); \
-		echo "Uninstalled auto-git from $(INSTALL_PATH)"; \
-	else \
-		echo "auto-git is not installed at $(INSTALL_PATH)"; \
-	fi
+	$(UV) tool uninstall auto-git || true
 

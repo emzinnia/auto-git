@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "auto-git"
+version = "0.1.0"
+description = "AI-powered Git commit automation."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "click",
+  "openai",
+  "requests",
+  "watchdog",
+  "urllib3",
+]
+
+[project.scripts]
+auto-git = "auto_git.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest",
+  "pytest-mock",
+  "ruff",
+  "python-semantic-release",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["auto_git*"]
+
+[tool.semantic_release]
+version_source = "tag"
+commit_parser = "angular"
+changelog_file = "CHANGELOG.md"
+upload_to_release = true
+upload_to_pypi = false
+tag_format = "v{version}"
+branch = "main"
