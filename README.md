@@ -12,17 +12,7 @@ AI can make mistakes. Don't use this for your missile software.
 
 - Python 3.11 or newer
 
-### Install `uv` (recommended)
-
-`uv` is a fast Python package + project manager ([`astral-sh/uv`](https://github.com/astral-sh/uv)).
-
-Install with pip (or follow the official installer docs):
-
-```bash
-python -m pip install uv
-```
-
-### Install project dependencies
+### Install
 
 ```bash
 uv sync --all-groups
